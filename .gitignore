@@ -28,6 +28,8 @@ seoforge-fixes/
 gsc-service-account*.json
 *service-account*.json
 credentials*.json
+# Stray downloads such as Google Cloud key files in the repo root
+/*.json
 
 # Editors / OS
 .idea/
