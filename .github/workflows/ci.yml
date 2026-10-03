@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Install Chromium for rendering tests
+        run: playwright install --with-deps chromium
+      - name: Ruff
+        run: |
+          ruff check src tests
+          ruff format --check src tests
+      - name: Mypy
+        run: mypy
+      - name: Tests
+        run: pytest -q
+      - name: Smoke audit of the local test site
+        run: |
+          python tests/serve_site.py 8765 &
+          sleep 1
+          seoforge audit http://127.0.0.1:8765 --no-pagespeed --delay 0 -o smoke-report
+          test -s smoke-report/report.html
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t seoforge:ci .
+      - name: Run help
+        run: docker run --rm seoforge:ci --version

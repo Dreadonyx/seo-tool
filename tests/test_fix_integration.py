@@ -86,3 +86,17 @@ def test_planted_m2_issues(audited) -> None:  # type: ignore[no-untyped-def]
         "no-website-schema",
     } <= found
     assert "eeat-no-about" not in found and "eeat-no-contact" not in found
+
+
+def test_apply_never_escapes_site_root(tmp_path: Path) -> None:
+    from seoforge.fix.bundle import FixBundle, apply_bundle, safe_join
+
+    root = tmp_path / "site"
+    root.mkdir()
+    bundle = FixBundle()
+    bundle.add("markdown/x.md", "evil", "", "../../outside.md")
+    bundle.add("ok.md", "fine", "", "docs/ok.md")
+    changed = apply_bundle(bundle, root, lambda _p, _d: True)
+    assert changed == [(root / "docs/ok.md").resolve()]
+    assert not (tmp_path.parent / "outside.md").exists()
+    assert safe_join(root, "a/../../b") is None and safe_join(root, "/robots.txt") is not None

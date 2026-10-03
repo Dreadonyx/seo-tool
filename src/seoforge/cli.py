@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 from collections.abc import Coroutine
 from pathlib import Path
 from typing import Annotated, Any, TypeVar
@@ -221,10 +220,6 @@ def _print_summary(report: Report) -> None:
     if len(report.issues) > 15:
         console.print(f"  ... {len(report.issues) - 15} more in the report")
     console.print(f"[dim]{DISCLAIMER}[/dim]")
-
-
-def entrypoint() -> None:  # pragma: no cover
-    sys.exit(app())
 
 
 @app.command()

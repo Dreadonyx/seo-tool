@@ -34,7 +34,9 @@ class FixBundle:
     def write(self, out_dir: Path) -> list[Path]:
         written = []
         for f in self.files:
-            target = out_dir / f.path
+            target = safe_join(out_dir, f.path)
+            if target is None:
+                continue
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(f.content, encoding="utf-8")
             written.append(target)
@@ -52,6 +54,13 @@ class FixBundle:
         ]
         (out_dir / "INDEX.md").write_text("\n".join(index) + "\n", encoding="utf-8")
         return written
+
+
+def safe_join(root: Path, relative: str) -> Path | None:
+    """Join a crawl-derived relative path under root; None if it would escape root."""
+    base = root.resolve()
+    target = (base / relative.lstrip("/")).resolve()
+    return target if target == base or base in target.parents else None
 
 
 def _slug(url: str) -> str:
@@ -181,7 +190,9 @@ def apply_bundle(bundle: FixBundle, site_root: Path, confirm: ConfirmFn) -> list
     for f in bundle.files:
         if not f.deploy_path:
             continue
-        target = site_root / f.deploy_path
+        target = safe_join(site_root, f.deploy_path)
+        if target is None:
+            continue  # never write outside the site root
         diff = diff_for(target, f.content)
         if not diff:
             continue

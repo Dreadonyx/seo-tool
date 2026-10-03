@@ -1,0 +1,77 @@
+name: SEOForge audit
+description: Audit a site for SEO, AEO and GEO issues on deploy, upload the report, and optionally fail the job.
+author: Dreadonyx
+branding:
+  icon: search
+  color: blue
+
+inputs:
+  url:
+    description: Site URL to audit (e.g. your preview or production URL).
+    required: true
+  max-pages:
+    description: Maximum pages to crawl.
+    default: "200"
+  fail-on:
+    description: Fail if issues at or above this severity exist (critical, high, medium, low, never).
+    default: critical
+  render:
+    description: Render JavaScript with headless Chromium ("true"/"false").
+    default: "false"
+  extra-args:
+    description: Extra arguments for `seoforge audit`.
+    default: ""
+  pagespeed-api-key:
+    description: Optional free PageSpeed Insights API key (pass a secret).
+    default: ""
+  python-version:
+    description: Python version to use.
+    default: "3.11"
+
+outputs:
+  report-dir:
+    description: Directory containing report.html, report.md and report.json.
+    value: ${{ steps.audit.outputs.report-dir }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+    - name: Install SEOForge
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        RENDER: ${{ inputs.render }}
+      run: |
+        python -m pip install --quiet "$ACTION_PATH"
+        if [ "$RENDER" = "true" ]; then playwright install --with-deps chromium; fi
+    - name: Audit
+      id: audit
+      shell: bash
+      env:
+        PAGESPEED_API_KEY: ${{ inputs.pagespeed-api-key }}
+        SEOFORGE_URL: ${{ inputs.url }}
+        MAX_PAGES: ${{ inputs.max-pages }}
+        FAIL_ON: ${{ inputs.fail-on }}
+        RENDER: ${{ inputs.render }}
+        EXTRA_ARGS: ${{ inputs.extra-args }}
+      run: |
+        set +e
+        args=(audit "$SEOFORGE_URL" --max-pages "$MAX_PAGES" --fail-on "$FAIL_ON" -o seoforge-report)
+        if [ "$RENDER" = "true" ]; then args+=(--render); fi
+        read -ra extra <<< "$EXTRA_ARGS"
+        seoforge "${args[@]}" "${extra[@]}"
+        status=$?
+        echo "report-dir=seoforge-report" >> "$GITHUB_OUTPUT"
+        if [ -f seoforge-report/report.md ]; then
+          head -c 60000 seoforge-report/report.md >> "$GITHUB_STEP_SUMMARY"
+        fi
+        exit $status
+    - name: Upload report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: seoforge-report
+        path: seoforge-report

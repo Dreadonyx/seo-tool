@@ -1,0 +1,11 @@
+.git
+.venv
+.seoforge
+.mypy_cache
+.ruff_cache
+.pytest_cache
+**/__pycache__
+seoforge-report
+seoforge-fixes
+tests
+docs

@@ -35,6 +35,123 @@
      SQLite (.seoforge/seoforge.db): page cache · frontier · autosuggest cache · quotas · AI visibility
 ```
 
+## Folder tree
+
+```
+action.yml
+Dockerfile
+.dockerignore
+docs/
+  ARCHITECTURE.md
+  github-action.md
+.github/
+  workflows/
+    ci.yml
+.gitignore
+LICENSE
+.pre-commit-config.yaml
+pyproject.toml
+README.md
+src/
+  seoforge/
+    analysis/
+      aeo.py
+      competitors.py
+      __init__.py
+      keywords.py
+      pagetype.py
+      performance.py
+      structured_data.py
+      suggest.py
+    audit.py
+    checks/
+      aeo.py
+      base.py
+      crawl.py
+      geo.py
+      __init__.py
+      keywords.py
+      onpage.py
+      performance.py
+      structured_data.py
+      technical.py
+    cli.py
+    config.py
+    crawler/
+      crawler.py
+      __init__.py
+      parser.py
+      renderer.py
+      sitemaps.py
+    enrichers.py
+    fix/
+      bundle.py
+      __init__.py
+    generators/
+      __init__.py
+      llms.py
+      markdown.py
+      meta.py
+      redirects.py
+      robots.py
+      schema.py
+      sitemap.py
+    geo/
+      ai_bots.py
+      analysis.py
+      citation.py
+      commoncrawl.py
+      entity.py
+      extras.py
+      __init__.py
+      visibility.py
+    http.py
+    indexing/
+      bing.py
+      diagnose.py
+      engines.py
+      gsc.py
+      indexnow.py
+      __init__.py
+    __init__.py
+    models.py
+    offpage/
+      broken_links.py
+      checklist.py
+      __init__.py
+      mentions.py
+    report/
+      builder.py
+      __init__.py
+      limitations.py
+      render.py
+      templates/
+        report.html.j2
+        report.md.j2
+    robots.py
+    sources.py
+    storage.py
+    urls.py
+tests/
+  site/                      # local test website with planted SEO problems
+  conftest.py
+  plugins/
+    demo_plugin.py
+  serve_site.py
+  test_analysis_network.py
+  test_audit_integration.py
+  test_fix_integration.py
+  test_geo.py
+  test_indexing_offpage.py
+  test_plugins_and_report.py
+  unit/
+    test_aeo_generators.py
+    test_keywords.py
+    test_parsing.py
+    test_robots.py
+    test_structured_data.py
+```
+
 ## Data flow
 
 1. **Crawl** (`crawler/`): `PoliteClient` fetches with per-host throttling, robots.txt
