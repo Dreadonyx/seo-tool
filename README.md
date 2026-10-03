@@ -39,7 +39,7 @@ seoforge diagnose https://example.com/page  # why isn't this URL indexed?
 Requires Python 3.11+.
 
 ```bash
-git clone https://github.com/Dreadonyx/seoforge && cd seoforge
+git clone https://github.com/Dreadonyx/seo-tool && cd seo-tool
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
 # Optional extras:
@@ -159,7 +159,7 @@ the generated `<key>.txt` to your site root, `export INDEXNOW_KEY=<key>`, then
 Audit every deploy and upload the report as an artifact (see `docs/github-action.md`):
 
 ```yaml
-- uses: Dreadonyx/seoforge@main
+- uses: Dreadonyx/seo-tool@main
   with:
     url: https://example.com
     fail-on: critical

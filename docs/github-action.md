@@ -11,7 +11,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.deployment_status.state == 'success'
     runs-on: ubuntu-latest
     steps:
-      - uses: Dreadonyx/seoforge@main
+      - uses: Dreadonyx/seo-tool@main
         with:
           url: ${{ github.event.deployment_status.environment_url || 'https://example.com' }}
           max-pages: "300"

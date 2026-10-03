@@ -47,7 +47,7 @@ dev = [
 seoforge = "seoforge.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/Dreadonyx/seoforge"
+Homepage = "https://github.com/Dreadonyx/seo-tool"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/seoforge"]
