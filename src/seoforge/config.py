@@ -14,7 +14,7 @@ from seoforge import USER_AGENT
 BotPolicy = Literal["allow", "deny"]
 ReportFormat = Literal["html", "md", "json"]
 ALL_FORMATS: tuple[ReportFormat, ...] = ("html", "md", "json")
-BotPreset = Literal["allow-all", "search-only", "deny-training", "deny-all", "custom"]
+BotPreset = Literal["allow-all", "search-only", "deny-all", "custom"]
 
 
 class CrawlConfig(BaseModel):
@@ -69,6 +69,8 @@ class EntityConfig(BaseModel):
     city: str | None = None
     same_as: list[str] = Field(default_factory=list)
     wikidata_id: str | None = None
+    # Your site-search URL with {search_term_string}, e.g. https://example.com/search?q={search_term_string}
+    site_search_url: str | None = None
 
 
 class GeoConfig(BaseModel):
@@ -141,7 +143,7 @@ entity:
     - https://github.com/example
     - https://www.linkedin.com/company/example
 geo:
-  ai_bot_preset: search-only  # allow-all | search-only | deny-training | deny-all | custom
+  ai_bot_preset: search-only  # allow-all | search-only | deny-all | custom
   ai_bots:                    # per-bot overrides
     CCBot: deny
 competitors:

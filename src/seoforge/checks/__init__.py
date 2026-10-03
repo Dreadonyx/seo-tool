@@ -6,4 +6,6 @@ BUILTIN_MODULES = (
     "seoforge.checks.onpage",
     "seoforge.checks.performance",
     "seoforge.checks.keywords",
+    "seoforge.checks.structured_data",
+    "seoforge.checks.aeo",
 )

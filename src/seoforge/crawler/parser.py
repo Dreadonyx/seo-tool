@@ -20,8 +20,11 @@ BOILERPLATE = (
 BLOCKS = "p, li, h1, h2, h3, h4, h5, h6, td, th, dd, dt, blockquote, figcaption, pre, summary"
 
 
+SPACE_BEFORE_PUNCT = re.compile(r"\s+([,.;:!?)\]%])")
+
+
 def clean(text: str | None) -> str:
-    return WS_RE.sub(" ", text or "").strip()
+    return SPACE_BEFORE_PUNCT.sub(r"\1", WS_RE.sub(" ", text or "")).strip()
 
 
 def words(text: str) -> list[str]:
@@ -174,9 +177,13 @@ def parse_html(page: PageData, html: str, site: str) -> PageData:
         page.paragraphs = [
             p for p in (clean(n.text(separator=" ")) for n in main_node.css("p")) if p
         ]
-        page.blocks = [
-            b for b in (clean(n.text(separator=" ")) for n in main_node.css(BLOCKS)) if b
+        page.outline = [
+            (n.tag or "", text)
+            for n in main_node.css(BLOCKS)
+            if (text := clean(n.text(separator=" ")))
         ]
+        page.blocks = [text for _, text in page.outline]
+        page.has_details = main_node.css_first("details") is not None
         page.lists_count = len(main_node.css("ul, ol"))
         page.tables_count = len(main_node.css("table"))
     page.word_count = len(words(page.text))

@@ -125,6 +125,8 @@ class PageData:
     word_count: int = 0
     paragraphs: list[str] = field(default_factory=list)
     blocks: list[str] = field(default_factory=list)  # text of block elements (p, li, h*, td...)
+    outline: list[tuple[str, str]] = field(default_factory=list)  # (tag, text) in document order
+    has_details: bool = False  # <details>/<summary> accordions (common FAQ pattern)
     lists_count: int = 0
     tables_count: int = 0
     times: list[str] = field(default_factory=list)  # <time datetime> values

@@ -223,3 +223,85 @@ def _print_summary(report: Report) -> None:
 
 def entrypoint() -> None:  # pragma: no cover
     sys.exit(app())
+
+
+@app.command()
+def fix(
+    url: Annotated[
+        str | None, typer.Argument(help="Site URL to crawl and generate fixes for.")
+    ] = None,
+    config_path: ConfigOpt = None,
+    out: Annotated[Path, typer.Option("--out", "-o", help="Output directory.")] = Path(
+        "seoforge-fixes"
+    ),
+    max_pages: Annotated[int | None, typer.Option("--max-pages", "-n")] = None,
+    ai_policy: Annotated[
+        str | None,
+        typer.Option(
+            "--ai-policy", help="AI crawler preset: allow-all | search-only | deny-all | custom."
+        ),
+    ] = None,
+    redirect_map: Annotated[
+        Path | None,
+        typer.Option("--redirect-map", help="CSV of old,new[,status] redirects to include."),
+    ] = None,
+    apply_to: Annotated[
+        Path | None,
+        typer.Option(
+            "--apply-to",
+            help="Local site root (e.g. ./public). Shows a diff and asks before each write.",
+        ),
+    ] = None,
+    yes: Annotated[
+        bool, typer.Option("--yes", help="With --apply-to: accept all diffs without prompting.")
+    ] = False,
+    cached: Annotated[bool, typer.Option("--cached", help="Reuse cached responses.")] = False,
+    delay: Annotated[float | None, typer.Option("--delay")] = None,
+) -> None:
+    """Generate robots.txt, sitemap.xml, llms.txt, JSON-LD, meta tags and redirects.
+
+    Files are written to --out. Nothing on your site changes unless you pass --apply-to with a
+    LOCAL directory, review each diff and confirm it. SEOForge never modifies remote sites.
+    """
+    from rich.syntax import Syntax
+
+    from seoforge.fix.bundle import apply_bundle, build_bundle
+    from seoforge.geo.extras import add_geo_files
+
+    config = _load(config_path)
+    site = _site(url, config)
+    if max_pages is not None:
+        config.crawl.max_pages = max_pages
+    if delay is not None:
+        config.crawl.delay_seconds = delay
+    if ai_policy and ai_policy not in ("allow-all", "search-only", "deny-all", "custom"):
+        err.print(f"[red]Unknown --ai-policy {ai_policy}[/red]")
+        raise typer.Exit(2)
+    if redirect_map and not redirect_map.is_file():
+        err.print(f"[red]Redirect map not found: {redirect_map}[/red]")
+        raise typer.Exit(2)
+    with console.status(f"Crawling {site}"):
+        _report, ctx = run(run_audit(site, config, AuditOptions(cached=cached, pagespeed=False)))
+    bundle = build_bundle(ctx, preset=ai_policy, redirect_map=redirect_map, extra=add_geo_files)
+    written = bundle.write(out)
+    console.print(f"Wrote {len(written)} file(s) to [bold]{out}[/bold] (see {out / 'INDEX.md'})")
+    for f in bundle.files[:40]:
+        console.print(f"  {f.path:<52} {f.description}")
+    if apply_to is None:
+        console.print(
+            "[dim]Nothing on your site was changed. Use --apply-to <local dir> to apply with a diff preview.[/dim]"
+        )
+        return
+    if not apply_to.is_dir():
+        err.print(f"[red]--apply-to must be an existing local directory: {apply_to}[/red]")
+        raise typer.Exit(2)
+
+    def confirm(path: str, diff: str) -> bool:
+        console.rule(path)
+        console.print(Syntax(diff, "diff", theme="ansi_dark", word_wrap=True))
+        if yes:
+            return True
+        return typer.confirm(f"Write {path}?", default=False)
+
+    changed = apply_bundle(bundle, apply_to, confirm)
+    console.print(f"Applied {len(changed)} file(s) in {apply_to}.")
