@@ -611,3 +611,488 @@ def vis_report(
     if json_out:
         json_out.write_text(_json.dumps(data, indent=2), encoding="utf-8")
         console.print(f"Wrote {json_out}")
+
+
+@geo_app.command("commoncrawl")
+def geo_commoncrawl(
+    url: Annotated[str | None, typer.Argument(help="Site URL.")] = None,
+    config_path: ConfigOpt = None,
+) -> None:
+    """How many of your URLs are in the latest Common Crawl index (free CDX API)."""
+    from seoforge.geo.commoncrawl import presence
+    from seoforge.http import PoliteClient
+
+    config = _load(config_path)
+    site = _site(url, config)
+
+    async def go() -> Any:
+        async with PoliteClient(config.crawl) as client:
+            return await presence(client.http, site)
+
+    with console.status("Querying Common Crawl index"):
+        result = run(go())
+    if result.error:
+        err.print(f"[yellow]Common Crawl query failed: {result.error}[/yellow]")
+        raise typer.Exit(1)
+    console.print(
+        f"{result.domain}: {result.captures} capture(s) in {result.crawl_id} (first 1,000 counted)"
+    )
+    for u in result.sample:
+        console.print(f"  {u}")
+    console.print(
+        "[dim]Presence in Common Crawl is a rough signal of availability to LLM training "
+        "pipelines, not proof any model used your content.[/dim]"
+    )
+
+
+# ---- Indexing --------------------------------------------------------------------------------
+index_app = typer.Typer(help="Legitimate indexing: sitemaps, IndexNow, Search Console, Bing.")
+app.add_typer(index_app, name="index")
+
+
+def _confirm_send(what: str, yes: bool, dry_run: bool) -> bool:
+    if dry_run:
+        console.print(f"[yellow]Dry run:[/yellow] would {what}. Nothing sent.")
+        return False
+    return yes or typer.confirm(f"{what[0].upper()}{what[1:]}?", default=False)
+
+
+def _urls_from(
+    site: str, config: Config, urls_file: Path | None, changed_only: bool, max_pages: int | None
+) -> tuple[list[str], dict[str, str]]:
+    if urls_file:
+        urls = [
+            u.strip() for u in urls_file.read_text().splitlines() if u.strip().startswith("http")
+        ]
+        return urls, {}
+    if max_pages:
+        config.crawl.max_pages = max_pages
+    with console.status("Crawling to collect indexable URLs"):
+        _r, ctx = run(run_audit(site, config, AuditOptions(pagespeed=False)))
+    hashes = {p.url: p.content_hash for p in ctx.pages if p.is_indexable}
+    if changed_only:
+        from seoforge.indexing.indexnow import changed_urls
+
+        return changed_urls(_store(config), hashes), hashes
+    return list(hashes), hashes
+
+
+@index_app.command("engines")
+def index_engines() -> None:
+    """Which search engines accept submissions, and how."""
+    from seoforge.indexing.engines import ENGINES, NOTE
+
+    table = Table("Engine", "Index", "How to get indexed", "SEOForge")
+    for e in ENGINES:
+        table.add_row(e.name, e.index, e.how + (f"\n{e.url}" if e.url else ""), e.seoforge or "-")
+    console.print(table)
+    console.print(f"[dim]{NOTE}[/dim]")
+
+
+@index_app.command("indexnow-key")
+def indexnow_key(
+    out: Annotated[
+        Path, typer.Option("--out", "-o", help="Directory to write <key>.txt into.")
+    ] = Path("."),
+) -> None:
+    """Generate an IndexNow key and its key file (upload it to your site root)."""
+    from seoforge.indexing.indexnow import generate_key
+
+    key = generate_key()
+    path = out / f"{key}.txt"
+    path.write_text(key, encoding="utf-8")
+    console.print(
+        f"Key: [bold]{key}[/bold]\nWrote {path}. Upload it so https://<your-site>/{key}.txt "
+        "returns the key, then export INDEXNOW_KEY=<key>."
+    )
+
+
+@index_app.command("indexnow")
+def indexnow_cmd(
+    url: Annotated[str | None, typer.Argument(help="Site URL.")] = None,
+    config_path: ConfigOpt = None,
+    key: Annotated[
+        str | None, typer.Option("--key", help="IndexNow key (default: $INDEXNOW_KEY).")
+    ] = None,
+    key_location: Annotated[
+        str | None, typer.Option("--key-location", help="Key file URL if not at the root.")
+    ] = None,
+    urls_file: Annotated[
+        Path | None, typer.Option("--urls", help="File with one URL per line (skips crawl).")
+    ] = None,
+    all_urls: Annotated[
+        bool, typer.Option("--all", help="Submit every indexable URL, not only changed ones.")
+    ] = False,
+    max_pages: Annotated[int | None, typer.Option("--max-pages", "-n")] = None,
+    yes: Annotated[bool, typer.Option("--yes", help="Skip the confirmation prompt.")] = False,
+    dry_run: Annotated[bool, typer.Option("--dry-run")] = False,
+) -> None:
+    """Notify IndexNow engines (Bing, Yandex, Seznam, Naver, Yep) about changed URLs."""
+    from seoforge.http import PoliteClient
+    from seoforge.indexing import indexnow as ix
+
+    config = _load(config_path)
+    site = _site(url, config)
+    key = key or config.api.env("indexnow_key_env")
+    if not key or not ix.valid_key(key):
+        err.print(
+            "[red]Provide a valid key (--key or INDEXNOW_KEY). Create one: seoforge index indexnow-key[/red]"
+        )
+        raise typer.Exit(2)
+    urls, hashes = _urls_from(
+        site, config, urls_file, changed_only=not all_urls, max_pages=max_pages
+    )
+    urls, rejected = ix.filter_urls(urls, site)
+    if rejected:
+        console.print(f"[yellow]Skipping {len(rejected)} URL(s) from other hosts.[/yellow]")
+    if not urls:
+        console.print("No changed URLs to submit (use --all to force).")
+        return
+
+    async def check() -> Any:
+        async with PoliteClient(config.crawl) as client:
+            return await ix.verify_key_file(client.http, site, key, key_location)
+
+    kc = run(check())
+    if not kc.ok:
+        err.print(f"[red]Key file check failed at {kc.url}: {kc.detail}[/red]")
+        raise typer.Exit(1)
+    for u in urls[:10]:
+        console.print(f"  {u}")
+    if len(urls) > 10:
+        console.print(f"  ... and {len(urls) - 10} more")
+    if not _confirm_send(f"submit {len(urls)} URL(s) to IndexNow", yes, dry_run):
+        return
+
+    async def send() -> Any:
+        async with PoliteClient(config.crawl) as client:
+            return await ix.submit(client.http, site, key, urls, key_location)
+
+    results = run(send())
+    for r in results:
+        console.print(f"Batch {r.batch}: {r.count} URL(s) -> HTTP {r.status} ({r.meaning})")
+    if all(r.status in (200, 202) for r in results) and hashes:
+        ix.remember(_store(config), {u: hashes[u] for u in urls if u in hashes})
+
+
+@index_app.command("gsc-sitemap")
+def gsc_sitemap(
+    url: Annotated[str | None, typer.Argument(help="Site URL.")] = None,
+    config_path: ConfigOpt = None,
+    sitemap_url: Annotated[
+        str | None, typer.Option("--sitemap", help="Default: <site>/sitemap.xml")
+    ] = None,
+    domain_property: Annotated[
+        bool, typer.Option("--domain-property", help="Use sc-domain: property.")
+    ] = False,
+    yes: Annotated[bool, typer.Option("--yes")] = False,
+    dry_run: Annotated[bool, typer.Option("--dry-run")] = False,
+) -> None:
+    """Submit a sitemap to Google Search Console."""
+    from seoforge.http import PoliteClient
+    from seoforge.indexing.gsc import GSCAuthError, GSCClient, get_token, property_url
+
+    config = _load(config_path)
+    site = _site(url, config)
+    prop = property_url(site, domain_property)
+    target = sitemap_url or f"{site.rstrip('/')}/sitemap.xml"
+    if not _confirm_send(f"submit {target} to Search Console property {prop}", yes, dry_run):
+        return
+    try:
+        token = get_token(config.api.gsc_credentials_env)
+    except GSCAuthError as exc:
+        err.print(f"[red]{exc}[/red]")
+        raise typer.Exit(2) from exc
+
+    async def go() -> Any:
+        async with PoliteClient(config.crawl) as client:
+            gsc = GSCClient(client.http, token)
+            await gsc.submit_sitemap(prop, target)
+            return await gsc.list_sitemaps(prop)
+
+    for sm in run(go()):
+        console.print(
+            f"  {sm.get('path')}  last submitted {sm.get('lastSubmitted')}  "
+            f"errors {sm.get('errors', 0)}  warnings {sm.get('warnings', 0)}"
+        )
+
+
+@index_app.command("gsc-inspect")
+def gsc_inspect(
+    urls: Annotated[list[str], typer.Argument(help="URL(s) to inspect.")],
+    config_path: ConfigOpt = None,
+    site: Annotated[
+        str | None, typer.Option("--site", help="Property URL (default: config site).")
+    ] = None,
+    domain_property: Annotated[bool, typer.Option("--domain-property")] = False,
+    budget: Annotated[
+        int, typer.Option("--budget", help="Max inspections per day (<= 2000).")
+    ] = 2000,
+) -> None:
+    """URL Inspection (index status) - quota-aware: 2,000/day and 600/minute per property."""
+    from seoforge.http import PoliteClient
+    from seoforge.indexing.gsc import GSCAuthError, GSCClient, get_token, property_url
+
+    config = _load(config_path)
+    prop = property_url(_site(site, config), domain_property)
+    try:
+        token = get_token(config.api.gsc_credentials_env)
+    except GSCAuthError as exc:
+        err.print(f"[red]{exc}[/red]")
+        raise typer.Exit(2) from exc
+    store = _store(config)
+
+    async def go() -> Any:
+        async with PoliteClient(config.crawl) as client:
+            gsc = GSCClient(client.http, token, store, budget)
+            return [await gsc.inspect(prop, u) for u in urls], gsc.remaining(prop)
+
+    results, remaining = run(go())
+    table = Table("URL", "Verdict", "Coverage", "Robots", "Google canonical", "Last crawl")
+    for r in results:
+        table.add_row(
+            r.url,
+            r.error or r.verdict or "",
+            r.coverage or "",
+            r.robots or "",
+            r.google_canonical or "",
+            r.last_crawl or "",
+        )
+    console.print(table)
+    console.print(f"[dim]Remaining inspection budget today: {remaining}[/dim]")
+
+
+@index_app.command("bing")
+def bing_cmd(
+    url: Annotated[
+        str | None, typer.Argument(help="Site URL (as verified in Bing Webmaster Tools).")
+    ] = None,
+    config_path: ConfigOpt = None,
+    sitemap: Annotated[
+        bool, typer.Option("--sitemap/--no-sitemap", help="Submit <site>/sitemap.xml.")
+    ] = True,
+    urls_file: Annotated[
+        Path | None, typer.Option("--urls", help="Also submit these URLs (one per line).")
+    ] = None,
+    quota_only: Annotated[
+        bool, typer.Option("--quota", help="Only show the URL submission quota.")
+    ] = False,
+    yes: Annotated[bool, typer.Option("--yes")] = False,
+    dry_run: Annotated[bool, typer.Option("--dry-run")] = False,
+) -> None:
+    """Bing Webmaster Tools: submit sitemap and/or URLs (quota-aware)."""
+    from seoforge.http import PoliteClient
+    from seoforge.indexing.bing import BingClient, BingError
+
+    config = _load(config_path)
+    site = _site(url, config)
+    key = config.api.env("bing_key_env")
+    if not key:
+        err.print(
+            "[red]Set BING_WEBMASTER_API_KEY (Bing Webmaster Tools > Settings > API access).[/red]"
+        )
+        raise typer.Exit(2)
+    urls = [u.strip() for u in urls_file.read_text().splitlines() if u.strip()] if urls_file else []
+
+    async def go() -> None:
+        async with PoliteClient(config.crawl) as client:
+            bing = BingClient(client.http, key)
+            q = await bing.quota(site)
+            console.print(f"URL submission quota: {q.daily} today, {q.monthly} this month")
+            if quota_only:
+                return
+            if sitemap and _confirm_send(
+                f"submit {site.rstrip('/')}/sitemap.xml to Bing", yes, dry_run
+            ):
+                await bing.submit_sitemap(site, f"{site.rstrip('/')}/sitemap.xml")
+                console.print("Sitemap submitted.")
+            if urls and _confirm_send(
+                f"submit {min(len(urls), q.daily)} URL(s) to Bing", yes, dry_run
+            ):
+                n = await bing.submit_urls(site, urls)
+                console.print(f"Submitted {n} URL(s).")
+
+    try:
+        run(go())
+    except BingError as exc:
+        err.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+
+
+@app.command()
+def diagnose(
+    url: Annotated[str, typer.Argument(help="The URL that isn't indexed.")],
+    config_path: ConfigOpt = None,
+    crawl_pages: Annotated[
+        int, typer.Option("--crawl-pages", help="Crawl N pages to count internal links to it.")
+    ] = 0,
+    gsc: Annotated[
+        bool, typer.Option("--gsc", help="Also run Search Console URL Inspection.")
+    ] = False,
+) -> None:
+    """Why isn't this URL indexed? Checks robots, status, redirects, noindex, canonical, sitemap..."""
+    from seoforge.http import PoliteClient
+    from seoforge.indexing.diagnose import CLOSING_NOTE
+    from seoforge.indexing.diagnose import diagnose as run_diagnose
+
+    config = _load(config_path)
+    store = _store(config)
+    with console.status("Diagnosing"):
+        result = run(run_diagnose(url, config, store, crawl_pages=crawl_pages))
+    icons = {
+        "pass": "[green]PASS[/green]",
+        "warn": "[yellow]WARN[/yellow]",
+        "fail": "[red]FAIL[/red]",
+        "info": "[dim]INFO[/dim]",
+    }
+    table = Table("", "Check", "Detail", "Fix")
+    for f in result.findings:
+        table.add_row(icons[f.status], f.check, f.detail, f.fix)
+    console.print(table)
+    if gsc:
+        from seoforge.indexing.gsc import GSCAuthError, GSCClient, get_token, property_url
+
+        try:
+            token = get_token(config.api.gsc_credentials_env)
+        except GSCAuthError as exc:
+            err.print(f"[yellow]GSC skipped: {exc}[/yellow]")
+        else:
+
+            async def inspect() -> Any:
+                async with PoliteClient(config.crawl) as client:
+                    from seoforge.http import origin
+
+                    return await GSCClient(client.http, token, store).inspect(
+                        property_url(origin(result.url)), result.url
+                    )
+
+            ins = run(inspect())
+            console.print(
+                f"Search Console: {ins.error or ins.verdict} - {ins.coverage or ''} "
+                f"(Google canonical: {ins.google_canonical or 'n/a'})"
+            )
+    if result.blockers:
+        console.print(
+            f"[red]{len(result.blockers)} blocker(s) found.[/red] Fix them, then request "
+            "indexing in Search Console once."
+        )
+    else:
+        console.print(f"[green]No technical blockers found.[/green] {CLOSING_NOTE}")
+
+
+# ---- Off-page --------------------------------------------------------------------------------
+off_app = typer.Typer(
+    help="Ethical off-page helpers: opportunities, broken links, unlinked mentions."
+)
+app.add_typer(off_app, name="offpage")
+
+
+@off_app.command("checklist")
+def off_checklist(
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Write Markdown to this file.")
+    ] = None,
+) -> None:
+    """Backlink opportunity checklist, directory list and anti-spam policy."""
+    from seoforge.offpage.checklist import checklist_markdown
+
+    md = checklist_markdown()
+    if out:
+        out.write_text(md, encoding="utf-8")
+        console.print(f"Wrote {out}")
+    else:
+        console.print(md)
+
+
+@off_app.command("policy")
+def off_policy() -> None:
+    """Print SEOForge's anti-spam policy."""
+    from seoforge.offpage.checklist import ANTI_SPAM_POLICY
+
+    console.print(ANTI_SPAM_POLICY)
+
+
+@off_app.command("broken-links")
+def off_broken_links(
+    pages: Annotated[list[str], typer.Argument(help="Resource pages in your niche to scan.")],
+    config_path: ConfigOpt = None,
+    wayback: Annotated[
+        bool, typer.Option("--wayback/--no-wayback", help="Look up archived copies.")
+    ] = True,
+    json_out: Annotated[Path | None, typer.Option("--json")] = None,
+) -> None:
+    """Find dead outbound links on resource pages (robots-aware) for broken-link building."""
+    import json as _json
+
+    import httpx
+
+    from seoforge.http import PoliteClient
+    from seoforge.offpage.broken_links import find_broken_links
+
+    config = _load(config_path)
+
+    async def go() -> Any:
+        async with PoliteClient(config.crawl) as client:
+            api = client.http if wayback else None
+            return await find_broken_links(client, pages, api=api)
+
+    with console.status("Checking links"):
+        try:
+            report = run(go())
+        except httpx.HTTPError as exc:
+            err.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1) from exc
+    for page, status in report.pages.items():
+        if status != "ok":
+            console.print(f"[yellow]{page}: {status}[/yellow]")
+    table = Table("Resource page", "Dead link", "Anchor", "Status", "Archived copy")
+    for d in report.dead:
+        table.add_row(d.resource_page, d.url, d.anchor, str(d.status or "error"), d.archived or "-")
+    console.print(table if report.dead else "No dead links found.")
+    console.print(
+        "[dim]Only suggest a replacement you'd genuinely recommend; one personal email per site.[/dim]"
+    )
+    if json_out:
+        json_out.write_text(_json.dumps(report.to_dict(), indent=2), encoding="utf-8")
+
+
+@off_app.command("mentions")
+def off_mentions(
+    url: Annotated[str | None, typer.Argument(help="Your site URL.")] = None,
+    brand: Annotated[
+        str | None, typer.Option("--brand", help="Brand name (default: entity.name).")
+    ] = None,
+    config_path: ConfigOpt = None,
+    json_out: Annotated[Path | None, typer.Option("--json")] = None,
+) -> None:
+    """Find brand mentions (Hacker News, Wikipedia) and check whether they link to you."""
+    import json as _json
+
+    from seoforge.http import PoliteClient
+    from seoforge.offpage.mentions import find_mentions
+
+    config = _load(config_path)
+    site = _site(url, config)
+    name = brand or config.entity.name
+    if not name:
+        err.print("[red]Pass --brand or set entity.name in seoforge.yaml.[/red]")
+        raise typer.Exit(2)
+
+    async def go() -> Any:
+        async with PoliteClient(config.crawl) as client:
+            return await find_mentions(client, client.http, name, site)
+
+    with console.status("Searching free sources"):
+        report = run(go())
+    table = Table("Source", "Title", "URL", "Links to you?", "Note")
+    for m in report.mentions:
+        linked = {True: "[green]yes[/green]", False: "[red]no[/red]", None: "?"}[m.linked]
+        table.add_row(m.source, m.title, m.url, linked, m.note)
+    console.print(table if report.mentions else "No mentions found in free sources.")
+    for source, error in report.errors.items():
+        console.print(f"[yellow]{source}: {error}[/yellow]")
+    console.print("Search manually (SEOForge does not scrape search engines):")
+    for s in report.manual_searches:
+        console.print(f"  {s}")
+    if json_out:
+        json_out.write_text(_json.dumps(report.to_dict(), indent=2), encoding="utf-8")

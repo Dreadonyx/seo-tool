@@ -19,6 +19,8 @@ SOFT_404 = b"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>Page not found</title></head><body><h1>Page not found</h1>
 <p>Sorry, we could not find that page.</p></body></html>"""
 
+INDEXNOW_KEY = "seoforgetestkey1234"
+
 REDIRECTS = {
     "/old-page": (301, "/old-page-2"),
     "/old-page-2": (302, "/about"),
@@ -76,6 +78,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
+        if path == f"/{INDEXNOW_KEY}.txt":
+            self._send(200, INDEXNOW_KEY.encode(), "text/plain; charset=utf-8")
+            return
         if path == "/broken-page":
             self._send(404, b"<html><title>404</title><body>Not found</body></html>")
             return
@@ -87,7 +92,8 @@ class Handler(BaseHTTPRequestHandler):
             # Deliberate soft 404: unknown URLs return 200.
             self._send(200, SOFT_404)
             return
-        body = f.read_bytes().replace(b"{{BASE}}", base.encode())
+        alt = f"localhost:{self.server.server_address[1]}"
+        body = f.read_bytes().replace(b"{{BASE}}", base.encode()).replace(b"{{ALT}}", alt.encode())
         ctype = {
             ".txt": "text/plain; charset=utf-8",
             ".xml": "application/xml",
