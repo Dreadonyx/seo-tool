@@ -8,4 +8,5 @@ BUILTIN_MODULES = (
     "seoforge.checks.keywords",
     "seoforge.checks.structured_data",
     "seoforge.checks.aeo",
+    "seoforge.checks.geo",
 )

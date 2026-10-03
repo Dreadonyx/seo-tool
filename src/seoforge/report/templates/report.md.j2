@@ -69,6 +69,36 @@ Keywords are extracted from your content (TF-IDF + YAKE + n-grams). Intent is a 
 {% endfor %}
 {% endif %}
 {% endif %}
+{% if d.extras.aeo %}
+## Answer-engine readiness (AEO)
+
+| Page | Question headings | Concise answers | FAQ | Author | Date |
+|---|---|---|---|---|---|
+{% for p in d.extras.aeo.pages %}
+| {{ p.url }} | {{ p.question_headings }} | {{ p.answer_blocks }} | {{ 'yes' if p.has_faq else 'no' }} | {{ 'yes' if p.eeat.author else 'no' }} | {{ 'yes' if p.eeat.date else 'no' }} |
+{% endfor %}
+
+{% endif %}
+{% if d.extras.geo %}
+## Generative-engine optimization (GEO)
+
+### AI crawler access (live robots.txt)
+
+| Bot | Operator | Purpose | Homepage |
+|---|---|---|---|
+{% for b in d.extras.geo.bots %}
+| {{ b.token }} | {{ b.operator }} | {{ b.purpose }} | {{ 'allowed' if b.allowed else 'blocked' }} |
+{% endfor %}
+
+### Citation-friendliness (heuristic estimate, 0-100)
+
+| Page | Score |
+|---|---|
+{% for c in d.extras.geo.citation %}
+| {{ c.url }} | {{ c.score }} |
+{% endfor %}
+
+{% endif %}
 {% if d.extras.performance %}
 ## Core Web Vitals
 

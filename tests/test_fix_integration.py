@@ -61,7 +61,7 @@ def test_fix_cli_apply_requires_confirmation(site_url: str, tmp_path: Path) -> N
         "--apply-to",
         str(site_root),
     ]
-    declined = CliRunner().invoke(app, args, input="n\nn\nn\nn\n")
+    declined = CliRunner().invoke(app, args, input="n\n" * 50)
     assert declined.exit_code == 0, declined.output
     assert (site_root / "robots.txt").read_text() == "User-agent: *\nDisallow:\n"
     assert not (site_root / "sitemap.xml").exists()

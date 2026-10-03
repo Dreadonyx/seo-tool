@@ -52,9 +52,16 @@ async def autosuggest(ctx: AuditContext, client: PoliteClient, store: Store, opt
     ctx.extras["suggestions"] = await suggestions(client.http, store, seeds)
 
 
+async def geo(ctx: AuditContext, client: PoliteClient, store: Store, options: Any) -> None:
+    from seoforge.geo.analysis import analyze
+
+    ctx.extras["geo"] = await analyze(ctx, client)
+
+
 ENRICHERS: list[tuple[str, EnricherFn]] = [
     ("Validating structured data", structured_data),
     ("Analyzing answer-engine readiness", aeo),
     ("Comparing competitor content", competitor_gap),
     ("Fetching Autosuggest ideas", autosuggest),
+    ("Analyzing AI crawler access and citation-friendliness", geo),
 ]

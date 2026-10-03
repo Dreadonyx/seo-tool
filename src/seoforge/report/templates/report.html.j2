@@ -171,6 +171,14 @@ a{color:var(--accent)}
   {% for b in d.extras.geo.bots %}<tr><td><strong>{{ b.token }}</strong></td><td>{{ b.operator }}</td><td>{{ b.purpose }}</td><td class="{{ 'sev-low' if b.allowed else 'sev-high' }}">{{ 'allowed' if b.allowed else 'blocked' }}</td><td>{{ 'yes' if b.explicit else 'no (falls back to *)' }}</td></tr>{% endfor %}
   </tbody></table>
   {% endif %}
+  <p>llms.txt: {{ 'found' if d.extras.geo.llms_txt_status == 200 else 'not found' }} · llms-full.txt: {{ 'found' if d.extras.geo.llms_full_status == 200 else 'not found' }} <span class="est">llms.txt is a proposal; AI providers have not confirmed using it</span></p>
+  {% if d.extras.geo.entity %}
+  <h3>Entity: {{ d.extras.geo.entity.name or 'unknown' }}</h3>
+  <table><thead><tr><th>Platform</th><th>Profile in sameAs</th></tr></thead><tbody>
+  {% for platform, link in d.extras.geo.entity.platforms.items() %}<tr><td>{{ platform }}</td><td class="url">{% if link %}<a href="{{ link }}" rel="noopener">{{ link }}</a>{% else %}<span class="est">missing</span>{% endif %}</td></tr>{% endfor %}
+  </tbody></table>
+  {% if d.extras.geo.entity.name_variants|length > 1 %}<p>Name variants: {% for v, n in d.extras.geo.entity.name_variants.items() %}<code>{{ v }}</code> ({{ n }}) {% endfor %}</p>{% endif %}
+  {% endif %}
   {% if d.extras.geo.citation %}
   <h3>Citation-friendliness <span class="est">heuristic estimate</span></h3>
   <table><thead><tr><th>Page</th><th>Score</th><th>Breakdown</th></tr></thead><tbody>
