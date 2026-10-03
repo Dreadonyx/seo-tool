@@ -1,0 +1,7 @@
+User-agent: *
+Disallow: /private/
+
+User-agent: GPTBot
+Disallow: /
+
+Sitemap: {{BASE}}/sitemap.xml

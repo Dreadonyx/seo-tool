@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SEOForge report - {{ r.site }}</title>
+<meta name="robots" content="noindex">
+<style>
+:root{--bg:#f7f7f5;--panel:#fff;--ink:#1d1d1f;--muted:#6b6b70;--line:#e4e4e0;--accent:#2f5bea;
+--critical:#c4231b;--high:#d9620b;--medium:#b38600;--low:#3a7a3a;--info:#6b6b70;--chip:#efefeb}
+@media (prefers-color-scheme:dark){:root{--bg:#121214;--panel:#1b1b1e;--ink:#ececef;--muted:#9a9aa3;
+--line:#2c2c31;--accent:#7a9bff;--critical:#ff6b61;--high:#ff9a4d;--medium:#e3bd3c;--low:#78c178;--info:#9a9aa3;--chip:#26262b}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{padding:28px 20px 8px;max-width:1180px;margin:auto}
+header h1{margin:0;font-size:22px;letter-spacing:-.01em}
+header p{margin:4px 0 0;color:var(--muted)}
+main{max-width:1180px;margin:auto;padding:0 20px 60px}
+.disclaimer{border-left:3px solid var(--accent);background:var(--panel);padding:10px 14px;margin:16px 0;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:16px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.card .v{font-size:24px;font-weight:650;font-variant-numeric:tabular-nums}
+.card .k{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.score .v{font-size:36px}
+.sev-critical{color:var(--critical)}.sev-high{color:var(--high)}.sev-medium{color:var(--medium)}.sev-low{color:var(--low)}.sev-info{color:var(--info)}
+nav.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-top:24px;overflow-x:auto}
+nav.tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px;color:var(--muted);font:inherit;cursor:pointer;white-space:nowrap}
+nav.tabs button[aria-selected=true]{color:var(--ink);border-color:var(--accent);font-weight:600}
+section.tab{display:none;padding-top:16px}section.tab.active{display:block}
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.filters input[type=search]{flex:1;min-width:200px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit}
+.chip{border:1px solid var(--line);background:var(--chip);border-radius:999px;padding:4px 10px;font-size:13px;cursor:pointer;color:var(--ink)}
+.chip[aria-pressed=false]{opacity:.45}
+details.issue{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin:8px 0}
+details.issue summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;gap:10px;align-items:baseline}
+details.issue summary::-webkit-details-marker{display:none}
+.badge{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 7px;border-radius:5px;border:1px solid currentColor;flex:none}
+.meta{color:var(--muted);font-size:13px;margin-left:auto;white-space:nowrap}
+.body{padding:0 14px 14px;border-top:1px solid var(--line)}
+.body h4{margin:12px 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.body p{margin:4px 0}
+.fix{background:var(--chip);border-radius:8px;padding:8px 10px}
+ul.urls{margin:4px 0;padding-left:18px;max-height:260px;overflow:auto;font-size:13px;word-break:break-all}
+pre{background:var(--chip);padding:10px;border-radius:8px;overflow:auto;font-size:12px;max-height:300px}
+table{border-collapse:collapse;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+td.url{word-break:break-all;max-width:380px}
+.est{font-size:11px;color:var(--muted);border:1px dashed var(--line);border-radius:5px;padding:1px 6px}
+.plan{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.plan ol{padding-left:18px}.plan li{margin:6px 0}
+a{color:var(--accent)}
+.empty{color:var(--muted);padding:20px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>SEOForge report: {{ r.site }}</h1>
+  <p>Generated {{ r.generated_at }} · SEOForge {{ r.version }} · {{ r.stats.urls_crawled }} URLs crawled</p>
+</header>
+<main>
+<div class="disclaimer">{{ r.disclaimer }}</div>
+
+<div class="grid">
+  <div class="card score"><div class="k">Health score <span class="est">estimate</span></div><div class="v">{{ r.score }}</div></div>
+  {% for sev in ['critical','high','medium','low'] %}
+  <div class="card"><div class="k">{{ sev }}</div><div class="v sev-{{ sev }}">{{ r.severity_counts[sev] }}</div></div>
+  {% endfor %}
+  <div class="card"><div class="k">Indexable pages</div><div class="v">{{ r.stats.indexable_pages }}</div></div>
+  <div class="card"><div class="k">Avg response</div><div class="v">{{ r.stats.avg_response_ms }}<small> ms</small></div></div>
+</div>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" aria-selected="true" data-tab="issues">Issues</button>
+  {% if d.extras.keywords %}<button role="tab" aria-selected="false" data-tab="keywords">Keywords</button>{% endif %}
+  {% if d.extras.aeo %}<button role="tab" aria-selected="false" data-tab="aeo">AEO</button>{% endif %}
+  {% if d.extras.geo %}<button role="tab" aria-selected="false" data-tab="geo">GEO</button>{% endif %}
+  {% if d.extras.performance %}<button role="tab" aria-selected="false" data-tab="perf">Performance</button>{% endif %}
+  <button role="tab" aria-selected="false" data-tab="plan">30/60/90 plan</button>
+  <button role="tab" aria-selected="false" data-tab="stats">Crawl stats</button>
+  <button role="tab" aria-selected="false" data-tab="limits">Limitations</button>
+</nav>
+
+<section class="tab active" id="tab-issues">
+  <div class="filters">
+    <input type="search" id="q" placeholder="Filter issues or URLs…" aria-label="Filter issues">
+    {% for sev in ['critical','high','medium','low','info'] %}
+    <button class="chip sev-{{ sev }}" aria-pressed="true" data-sev="{{ sev }}">{{ sev }} ({{ r.severity_counts[sev] }})</button>
+    {% endfor %}
+  </div>
+  {% for i in r.issues %}
+  <details class="issue" data-sev="{{ i.severity.value }}" data-text="{{ (i.title ~ ' ' ~ i.check_id ~ ' ' ~ i.category.value ~ ' ' ~ (i.urls|join(' ')))|lower }}">
+    <summary>
+      <span class="badge sev-{{ i.severity.value }}">{{ i.severity.value }}</span>
+      <span>{{ i.title }}{% if i.estimate %} <span class="est">estimate</span>{% endif %}</span>
+      <span class="meta">{{ i.category.value }} · effort {{ i.effort.value }}</span>
+    </summary>
+    <div class="body">
+      <h4>What</h4><p>{{ i.description }}</p>
+      {% if i.impact %}<h4>Impact</h4><p>{{ i.impact }}</p>{% endif %}
+      <h4>Fix</h4><p class="fix">{{ i.fix }}</p>
+      {% if i.source %}<h4>Source</h4><p><a href="{{ i.source }}" rel="noopener" target="_blank">{{ i.source }}</a></p>{% endif %}
+      {% if i.urls %}
+      <h4>Affected ({{ i.urls|length }})</h4>
+      <ul class="urls">{% for u in i.urls|first_n(200) %}<li>{{ u }}</li>{% endfor %}</ul>
+      {% endif %}
+      {% if i.evidence %}<h4>Evidence</h4><pre>{{ i.evidence|tojson_pretty }}</pre>{% endif %}
+      <p class="meta" style="margin:8px 0 0">check: {{ i.check_id }}</p>
+    </div>
+  </details>
+  {% else %}
+  <p class="empty">No issues found.</p>
+  {% endfor %}
+</section>
+
+{% if d.extras.keywords %}
+<section class="tab" id="tab-keywords">
+  <p>Extracted from your own content (TF-IDF + YAKE + n-grams). Intent is a rule-based <span class="est">estimate</span>. No search volumes: there is no free, reliable source.</p>
+  <table><thead><tr><th>Page</th><th>Primary</th><th>Intent</th><th>Secondary</th></tr></thead><tbody>
+  {% for p in d.extras.keywords.pages %}
+  <tr><td class="url">{{ p.url }}</td><td><strong>{{ p.primary or '-' }}</strong></td><td>{{ p.intent }}</td><td>{{ p.secondary[:5]|join(', ') }}</td></tr>
+  {% endfor %}
+  </tbody></table>
+  {% if d.extras.keywords.cannibalization %}
+  <h3>Cannibalization groups</h3>
+  <table><thead><tr><th>Keyword</th><th>Competing pages</th></tr></thead><tbody>
+  {% for k, urls in d.extras.keywords.cannibalization.items() %}<tr><td>{{ k }}</td><td class="url">{{ urls|join(', ') }}</td></tr>{% endfor %}
+  </tbody></table>
+  {% endif %}
+  {% if d.extras.keywords.clusters %}
+  <h3>Topic clusters <small class="est">{{ d.extras.keywords.clustering_method }}</small></h3>
+  <table><thead><tr><th>Cluster</th><th>Size</th><th>Keywords</th></tr></thead><tbody>
+  {% for c in d.extras.keywords.clusters[:40] %}<tr><td><strong>{{ c.label }}</strong></td><td>{{ c.size }}</td><td>{{ c.keywords[:12]|join(', ') }}</td></tr>{% endfor %}
+  </tbody></table>
+  {% endif %}
+  {% if d.extras.keyword_gap %}
+  <h3>Competitor content gap</h3>
+  <table><thead><tr><th>Term</th><th>Competitors using it</th><th>Weight</th></tr></thead><tbody>
+  {% for g in d.extras.keyword_gap.gaps[:60] %}<tr><td>{{ g.term }}</td><td>{{ g.competitors }}</td><td>{{ g.score }}</td></tr>{% endfor %}
+  </tbody></table>
+  {% endif %}
+  {% if d.extras.suggestions %}
+  <h3>Google Autosuggest ideas</h3>
+  <table><thead><tr><th>Seed</th><th>Suggestions</th></tr></thead><tbody>
+  {% for seed, s in d.extras.suggestions.items() %}<tr><td>{{ seed }}</td><td>{{ s|join(', ') }}</td></tr>{% endfor %}
+  </tbody></table>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if d.extras.aeo %}
+<section class="tab" id="tab-aeo">
+  <p>Question-style queries each page could answer, and whether a concise (40-60 word) answer block already exists. Suggestions are drafts for a human editor, built only from your page text.</p>
+  <table><thead><tr><th>Page</th><th>Questions</th><th>Answer blocks</th><th>FAQ</th><th>E-E-A-T signals</th></tr></thead><tbody>
+  {% for p in d.extras.aeo.pages %}
+  <tr><td class="url">{{ p.url }}</td>
+  <td>{% for q in p.questions[:5] %}{{ q }}<br>{% endfor %}</td>
+  <td>{{ p.answer_blocks }}/{{ p.question_headings }}</td>
+  <td>{{ 'yes' if p.has_faq else 'no' }}</td>
+  <td>{% for k, v in p.eeat.items() %}<span class="chip" style="cursor:default">{{ k }}: {{ 'yes' if v else 'no' }}</span> {% endfor %}</td></tr>
+  {% endfor %}
+  </tbody></table>
+</section>
+{% endif %}
+
+{% if d.extras.geo %}
+<section class="tab" id="tab-geo">
+  {% if d.extras.geo.bots %}
+  <h3>AI crawler access (from your live robots.txt)</h3>
+  <table><thead><tr><th>Bot</th><th>Operator</th><th>Purpose</th><th>Homepage allowed?</th><th>Explicit group?</th></tr></thead><tbody>
+  {% for b in d.extras.geo.bots %}<tr><td><strong>{{ b.token }}</strong></td><td>{{ b.operator }}</td><td>{{ b.purpose }}</td><td class="{{ 'sev-low' if b.allowed else 'sev-high' }}">{{ 'allowed' if b.allowed else 'blocked' }}</td><td>{{ 'yes' if b.explicit else 'no (falls back to *)' }}</td></tr>{% endfor %}
+  </tbody></table>
+  {% endif %}
+  {% if d.extras.geo.citation %}
+  <h3>Citation-friendliness <span class="est">heuristic estimate</span></h3>
+  <table><thead><tr><th>Page</th><th>Score</th><th>Breakdown</th></tr></thead><tbody>
+  {% for c in d.extras.geo.citation %}<tr><td class="url">{{ c.url }}</td><td><strong>{{ c.score }}</strong></td><td>{% for k, v in c.components.items() %}{{ k }} {{ v }} · {% endfor %}</td></tr>{% endfor %}
+  </tbody></table>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if d.extras.performance %}
+<section class="tab" id="tab-perf">
+  <p>Field data = Chrome UX Report (real users, p75, mobile). Lab = Lighthouse simulation. Good: LCP ≤ 2500 ms, INP ≤ 200 ms, CLS ≤ 0.1.</p>
+  <table><thead><tr><th>URL</th><th>Tool</th><th>Field LCP</th><th>Field INP</th><th>Field CLS</th><th>Lab LCP</th><th>Lab TBT</th><th>Score</th></tr></thead><tbody>
+  {% for p in d.extras.performance %}
+  <tr><td class="url">{{ p.url }}</td><td>{{ p.tool }}</td>
+  <td>{{ p.field_data.LCP|default('n/a') }}</td><td>{{ p.field_data.INP|default('n/a') }}</td><td>{{ p.field_data.CLS|default('n/a') }}</td>
+  <td>{{ p.lab.LCP|default(0)|round|int if p.lab.LCP else 'n/a' }}</td><td>{{ p.lab.TBT|default(0)|round|int if p.lab.TBT else 'n/a' }}</td>
+  <td>{{ (p.performance_score|round|int) if p.performance_score is not none else (p.error or 'n/a') }}</td></tr>
+  {% endfor %}
+  </tbody></table>
+</section>
+{% endif %}
+
+<section class="tab" id="tab-plan">
+  <div class="plan">
+  {% for bucket, label in [('30','Days 1-30 · fix blockers'),('60','Days 31-60 · strengthen'),('90','Days 61-90 · grow')] %}
+    <div class="card"><h3 style="margin-top:0">{{ label }}</h3><ol>
+    {% for t in r.plan[bucket] %}<li>{% if t.severity != 'plan' %}<span class="badge sev-{{ t.severity }}">{{ t.severity }}</span> {% endif %}{{ t.title }}</li>{% endfor %}
+    </ol></div>
+  {% endfor %}
+  </div>
+</section>
+
+<section class="tab" id="tab-stats">
+  <table><tbody>
+  {% for k, v in r.stats.items() %}<tr><th>{{ k.replace('_',' ') }}</th><td>{{ v }}</td></tr>{% endfor %}
+  </tbody></table>
+</section>
+
+<section class="tab" id="tab-limits">
+  <h3>What this tool cannot do</h3>
+  <ul>{% for l in r.limitations %}<li>{{ l }}</li>{% endfor %}</ul>
+  <h3>Search engine scope notes</h3>
+  <ul>{% for l in r.scope_notes %}<li>{{ l }}</li>{% endfor %}</ul>
+</section>
+</main>
+<script>
+document.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('nav.tabs button').forEach(x=>x.setAttribute('aria-selected',x===b));
+  document.querySelectorAll('section.tab').forEach(s=>s.classList.toggle('active',s.id==='tab-'+b.dataset.tab));
+}));
+const q=document.getElementById('q');const off=new Set();
+function apply(){const t=q.value.toLowerCase();document.querySelectorAll('details.issue').forEach(d=>{
+  d.style.display=(!off.has(d.dataset.sev)&&(!t||d.dataset.text.includes(t)))?'':'none';});}
+q.addEventListener('input',apply);
+document.querySelectorAll('.chip[data-sev]').forEach(c=>c.addEventListener('click',()=>{
+  const s=c.dataset.sev;off.has(s)?off.delete(s):off.add(s);c.setAttribute('aria-pressed',!off.has(s));apply();}));
+</script>
+</body>
+</html>

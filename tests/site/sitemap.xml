@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>{{BASE}}/</loc><lastmod>2026-09-01</lastmod></url>
+  <url><loc>{{BASE}}/about</loc></url>
+  <url><loc>{{BASE}}/orphan</loc></url>
+  <url><loc>{{BASE}}/noindex-page</loc></url>
+  <url><loc>{{BASE}}/broken-page</loc></url>
+  <url><loc>{{BASE}}/old-page</loc></url>
+  <url><loc>{{BASE}}/private/secret</loc></url>
+</urlset>

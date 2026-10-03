@@ -1,0 +1,102 @@
+# SEOForge report: {{ r.site }}
+
+Generated {{ r.generated_at }} by SEOForge {{ r.version }}
+
+> {{ r.disclaimer }}
+
+## Summary
+
+| Metric | Value |
+|---|---|
+| Health score (heuristic estimate) | **{{ r.score }}/100** |
+{% for k, v in r.stats.items() %}
+| {{ k.replace('_', ' ') }} | {{ v }} |
+{% endfor %}
+
+| Critical | High | Medium | Low | Info |
+|---|---|---|---|---|
+| {{ r.severity_counts.critical }} | {{ r.severity_counts.high }} | {{ r.severity_counts.medium }} | {{ r.severity_counts.low }} | {{ r.severity_counts.info }} |
+
+## Issues (by priority)
+
+{% for i in r.issues %}
+### [{{ i.severity.value|upper }}] {{ i.title }}
+
+- **Check:** `{{ i.check_id }}` · **Category:** {{ i.category.value }} · **Effort:** {{ i.effort.value }}{% if i.estimate %} · *estimate / heuristic*{% endif %}
+
+{{ i.description }}
+
+{% if i.impact %}
+**Impact:** {{ i.impact }}
+
+{% endif %}
+**Fix:** {{ i.fix }}
+
+{% if i.source %}
+**Source:** {{ i.source }}
+
+{% endif %}
+{% if i.urls %}
+<details><summary>{{ i.urls|length }} affected URL(s)</summary>
+
+{% for u in i.urls|first_n(50) %}
+- {{ u }}
+{% endfor %}
+{% if i.urls|length > 50 %}
+- ... and {{ i.urls|length - 50 }} more (see report.json)
+{% endif %}
+
+</details>
+
+{% endif %}
+{% endfor %}
+{% if d.extras.keywords %}
+## Keyword-to-page map
+
+Keywords are extracted from your content (TF-IDF + YAKE + n-grams). Intent is a rule-based estimate. No search volumes are shown because no free, reliable source exists.
+
+| Page | Primary keyword | Intent | Secondary |
+|---|---|---|---|
+{% for p in d.extras.keywords.pages %}
+| {{ p.url }} | {{ p.primary or '-' }} | {{ p.intent }} | {{ p.secondary[:3]|join(', ') }} |
+{% endfor %}
+
+{% if d.extras.keywords.clusters %}
+### Topic clusters ({{ d.extras.keywords.clustering_method }})
+
+{% for c in d.extras.keywords.clusters[:20] %}
+- **{{ c.label }}** ({{ c.size }}): {{ c.keywords[:10]|join(', ') }}
+{% endfor %}
+{% endif %}
+{% endif %}
+{% if d.extras.performance %}
+## Core Web Vitals
+
+| URL | Tool | Field LCP | Field INP | Field CLS | Lab score |
+|---|---|---|---|---|---|
+{% for p in d.extras.performance %}
+| {{ p.url }} | {{ p.tool }} | {{ p.field_data.LCP|default('n/a') }} | {{ p.field_data.INP|default('n/a') }} | {{ p.field_data.CLS|default('n/a') }} | {{ (p.performance_score|round|int) if p.performance_score is not none else (p.error or 'n/a') }} |
+{% endfor %}
+{% endif %}
+
+## 30 / 60 / 90-day plan
+
+{% for bucket, label in [('30', 'Days 1-30: fix blockers'), ('60', 'Days 31-60: strengthen'), ('90', 'Days 61-90: grow')] %}
+### {{ label }}
+
+{% for t in r.plan[bucket] %}
+- [ ] {% if t.severity != 'plan' %}**[{{ t.severity }}]** {% endif %}{{ t.title }}
+{% endfor %}
+
+{% endfor %}
+## What this tool cannot do
+
+{% for l in r.limitations %}
+- {{ l }}
+{% endfor %}
+
+### Search engine scope notes
+
+{% for l in r.scope_notes %}
+- {{ l }}
+{% endfor %}

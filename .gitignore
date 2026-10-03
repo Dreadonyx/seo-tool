@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.seoforge/
+seoforge-report/
+seoforge-fixes/
+dist/
+build/
+.coverage
+htmlcov/
+gsc-service-account*.json
